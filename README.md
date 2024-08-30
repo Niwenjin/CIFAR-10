@@ -15,3 +15,9 @@
 基于 resnet34，调整学习率 lr=2e-3 ，精度提升到 94.35%。
 
 继续增加学习率到 lr=5e-3，效果不佳。增加 scheduler = CosineAnnealingLR ，学习速度加快，精度略微提升到 94.48%。
+
+模型在训练集上的准确率已经达到 1，尝试增加训练集变换。增加 transforms.ColorJitter，精度略微提升到 94.95%。
+
+使用 SGD 优化器，参数 optimizer = optim.SGD(model.parameters(), lr = learning_rate, momentum=0.9)，拟合能力优秀，泛化效果不佳。
+
+增加 cutmix 和 mixup，继续使用SGD优化器，精度达到96.47%。

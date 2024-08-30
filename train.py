@@ -2,13 +2,14 @@ from model.net import resnet18, resnet34, resnet50, resnet101, resnet152
 from utils.dataset import trainset, testset
 from torch.utils.data import DataLoader, random_split
 from torch import nn, optim
+from torchvision.transforms import v2
 import torch
 import os
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
 # 定义device
-device = torch.device(f"cuda:{3}" if torch.cuda.is_available() else "cpu")
+device = torch.device(f"cuda:{0}" if torch.cuda.is_available() else "cpu")
 
 
 # def train(mymodel, data_loader, mycriterion, myoptimizer):
@@ -50,22 +51,26 @@ def train_evaluate(mymodel, train_loader):
     return train_accuracy
 
 
-def test(mymodel, data_loader):
+def test(mymodel, data_loader, criterion):
     mymodel.eval()
     correct = 0
     total = 0
+    total_loss = 0  # 添加总损失变量
 
     with torch.no_grad():
         for images, labels in tqdm(data_loader, desc="Testing", leave=False):
             images, labels = images.to(device), labels.to(device)
             outputs = mymodel(images)
+            loss = criterion(outputs, labels)  # 计算损失
+            total_loss += loss.item()  # 累加损失
 
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
 
     accuracy = correct / total
-    return accuracy
+    average_loss = total_loss / len(data_loader)  # 计算平均损失
+    return accuracy, average_loss
 
 
 def train(
@@ -88,10 +93,15 @@ def train(
     best_accuracy = 0.0
     best_model = None
 
+    cutmix = v2.CutMix(num_classes=10)
+    mixup = v2.MixUp(num_classes=10)
+    cutmix_or_mixup = v2.RandomChoice([cutmix, mixup])
+
     for epoch in range(epochs_num):
         model.train()
         running_loss = 0.0
         for images, labels in tqdm(train_loader, desc="Training", leave=False):
+            images, labels = cutmix_or_mixup(images, labels)
             images, labels = images.to(device), labels.to(device)
             outputs = model(images)
             loss = criterion(outputs, labels)
@@ -110,12 +120,13 @@ def train(
         )
 
         train_accuracy = train_evaluate(model, train_loader)
-        test_accuracy = test(model, test_loader)
+        test_accuracy, test_loss = test(model, test_loader, criterion)
+        writer.add_scalar("Loss/Test", test_loss, epoch + 1)
         writer.add_scalar("Accuracy/Train", train_accuracy, epoch + 1)
         writer.add_scalar("Accuracy/Test", test_accuracy, epoch + 1)
 
         print(
-            f"Train Accuracy: {train_accuracy:.4f}, Test Accuracy: {test_accuracy:.4f}\n"
+            f"Train Accuracy: {train_accuracy:.4f}, Test Accuracy: {test_accuracy:.4f}, Test Loss: {test_loss:.4f}\n"
         )
 
         if test_accuracy > best_accuracy:
@@ -150,9 +161,10 @@ if __name__ == "__main__":
     criterion = nn.CrossEntropyLoss()
     num_epochs = 500  # epochs_num
     learning_rate = 5e-3  # lr
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    # optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
-    save_dir = "runs/train2/"
+    save_dir = "runs/train5/"
 
     # 训练模型
     model, best_model = train(
