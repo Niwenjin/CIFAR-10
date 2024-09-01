@@ -164,7 +164,7 @@ if __name__ == "__main__":
     # optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
-    save_dir = "runs/train5/"
+    save_dir = "runs/train3/"
 
     # 训练模型
     model, best_model = train(
